@@ -32,7 +32,18 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
   Future<DeviceSettings> getSettingsData() async {
     var appState = context.read<ChameleonGUIState>();
     try {
-      return await appState.communicator!.getDeviceSettings();
+      var communicator = appState.communicator!;
+      var settings = await communicator.getDeviceSettings();
+      // Double-click config (settings version 7+) and chord config (version 8+)
+      // are read via dedicated commands; they are not part of the settings blob.
+      if (settings.settingsVersion >= 7) {
+        settings.aDouble = await communicator.getDoubleButtonConfig(ButtonType.a);
+        settings.bDouble = await communicator.getDoubleButtonConfig(ButtonType.b);
+      }
+      if (settings.settingsVersion >= 8) {
+        settings.chord = await communicator.getChordButtonConfig();
+      }
+      return settings;
     } catch (_) {
       return DeviceSettings();
     }
@@ -59,6 +70,18 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                 content: ErrorPage(errorMessage: snapshot.error.toString()));
           } else {
             DeviceSettings settings = snapshot.data;
+            // Shared option list for every button-config row. Index == device
+            // function value, so getButtonConfigType(index) maps a tapped index
+            // straight back to a ButtonConfig.
+            final buttonConfigItems = [
+              localizations.disable,
+              localizations.forward,
+              localizations.backward,
+              localizations.clone_uid,
+              localizations.charge,
+              localizations.field,
+              localizations.toggle_ble,
+            ];
             TextEditingController bleKeyController =
                 TextEditingController(text: settings.key);
             TextEditingController wakeTimeController = TextEditingController(
@@ -240,25 +263,10 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                         textScaler: const TextScaler.linear(0.8)),
                     const SizedBox(height: 7),
                     ToggleButtonsWrapper(
-                        items: [
-                          localizations.disable,
-                          localizations.forward,
-                          localizations.backward,
-                          localizations.clone_uid,
-                          localizations.charge
-                        ],
+                        items: buttonConfigItems,
                         selectedValue: settings.aPress.value,
                         onChange: (int index) async {
-                          var mode = ButtonConfig.disable;
-                          if (index == 1) {
-                            mode = ButtonConfig.cycleForward;
-                          } else if (index == 2) {
-                            mode = ButtonConfig.cycleBackward;
-                          } else if (index == 3) {
-                            mode = ButtonConfig.cloneUID;
-                          } else if (index == 4) {
-                            mode = ButtonConfig.chargeStatus;
-                          }
+                          var mode = getButtonConfigType(index);
 
                           await appState.communicator!
                               .setButtonConfig(ButtonType.a, mode);
@@ -272,25 +280,10 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                         textScaler: const TextScaler.linear(0.8)),
                     const SizedBox(height: 7),
                     ToggleButtonsWrapper(
-                        items: [
-                          localizations.disable,
-                          localizations.forward,
-                          localizations.backward,
-                          localizations.clone_uid,
-                          localizations.charge
-                        ],
+                        items: buttonConfigItems,
                         selectedValue: settings.bPress.value,
                         onChange: (int index) async {
-                          var mode = ButtonConfig.disable;
-                          if (index == 1) {
-                            mode = ButtonConfig.cycleForward;
-                          } else if (index == 2) {
-                            mode = ButtonConfig.cycleBackward;
-                          } else if (index == 3) {
-                            mode = ButtonConfig.cloneUID;
-                          } else if (index == 4) {
-                            mode = ButtonConfig.chargeStatus;
-                          }
+                          var mode = getButtonConfigType(index);
 
                           await appState.communicator!
                               .setButtonConfig(ButtonType.b, mode);
@@ -307,25 +300,10 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                         textScaler: const TextScaler.linear(0.8)),
                     const SizedBox(height: 7),
                     ToggleButtonsWrapper(
-                        items: [
-                          localizations.disable,
-                          localizations.forward,
-                          localizations.backward,
-                          localizations.clone_uid,
-                          localizations.charge
-                        ],
+                        items: buttonConfigItems,
                         selectedValue: settings.aLongPress.value,
                         onChange: (int index) async {
-                          var mode = ButtonConfig.disable;
-                          if (index == 1) {
-                            mode = ButtonConfig.cycleForward;
-                          } else if (index == 2) {
-                            mode = ButtonConfig.cycleBackward;
-                          } else if (index == 3) {
-                            mode = ButtonConfig.cloneUID;
-                          } else if (index == 4) {
-                            mode = ButtonConfig.chargeStatus;
-                          }
+                          var mode = getButtonConfigType(index);
 
                           await appState.communicator!
                               .setLongButtonConfig(ButtonType.a, mode);
@@ -339,25 +317,10 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                         textScaler: const TextScaler.linear(0.8)),
                     const SizedBox(height: 7),
                     ToggleButtonsWrapper(
-                        items: [
-                          localizations.disable,
-                          localizations.forward,
-                          localizations.backward,
-                          localizations.clone_uid,
-                          localizations.charge
-                        ],
+                        items: buttonConfigItems,
                         selectedValue: settings.bLongPress.value,
                         onChange: (int index) async {
-                          var mode = ButtonConfig.disable;
-                          if (index == 1) {
-                            mode = ButtonConfig.cycleForward;
-                          } else if (index == 2) {
-                            mode = ButtonConfig.cycleBackward;
-                          } else if (index == 3) {
-                            mode = ButtonConfig.cloneUID;
-                          } else if (index == 4) {
-                            mode = ButtonConfig.chargeStatus;
-                          }
+                          var mode = getButtonConfigType(index);
 
                           await appState.communicator!
                               .setLongButtonConfig(ButtonType.b, mode);
@@ -366,6 +329,68 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                           setState(() {});
                           appState.changesMade();
                         }),
+                    ...(settings.settingsVersion >= 7)
+                        ? [
+                            const SizedBox(height: 7),
+                            Text(localizations.double_press,
+                                textScaler: const TextScaler.linear(0.9)),
+                            const SizedBox(height: 7),
+                            Text("${localizations.button_x("A")}:",
+                                textScaler: const TextScaler.linear(0.8)),
+                            const SizedBox(height: 7),
+                            ToggleButtonsWrapper(
+                                items: buttonConfigItems,
+                                selectedValue: settings.aDouble.value,
+                                onChange: (int index) async {
+                                  var mode = getButtonConfigType(index);
+
+                                  await appState.communicator!
+                                      .setDoubleButtonConfig(ButtonType.a, mode);
+                                  await appState.communicator!.saveSettings();
+                                  settings.aDouble = mode;
+                                  setState(() {});
+                                  appState.changesMade();
+                                }),
+                            const SizedBox(height: 7),
+                            Text("${localizations.button_x("B")}:",
+                                textScaler: const TextScaler.linear(0.8)),
+                            const SizedBox(height: 7),
+                            ToggleButtonsWrapper(
+                                items: buttonConfigItems,
+                                selectedValue: settings.bDouble.value,
+                                onChange: (int index) async {
+                                  var mode = getButtonConfigType(index);
+
+                                  await appState.communicator!
+                                      .setDoubleButtonConfig(ButtonType.b, mode);
+                                  await appState.communicator!.saveSettings();
+                                  settings.bDouble = mode;
+                                  setState(() {});
+                                  appState.changesMade();
+                                }),
+                          ]
+                        : [],
+                    ...(settings.settingsVersion >= 8)
+                        ? [
+                            const SizedBox(height: 7),
+                            Text(localizations.chord_press,
+                                textScaler: const TextScaler.linear(0.9)),
+                            const SizedBox(height: 7),
+                            ToggleButtonsWrapper(
+                                items: buttonConfigItems,
+                                selectedValue: settings.chord.value,
+                                onChange: (int index) async {
+                                  var mode = getButtonConfigType(index);
+
+                                  await appState.communicator!
+                                      .setChordButtonConfig(mode);
+                                  await appState.communicator!.saveSettings();
+                                  settings.chord = mode;
+                                  setState(() {});
+                                  appState.changesMade();
+                                }),
+                          ]
+                        : [],
                     const SizedBox(height: 10),
                     const Text("BLE:"),
                     const SizedBox(height: 10),

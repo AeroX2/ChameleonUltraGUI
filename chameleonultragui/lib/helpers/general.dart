@@ -356,6 +356,10 @@ ButtonConfig getButtonConfigType(int value) {
     return ButtonConfig.cloneUID;
   } else if (value == 4) {
     return ButtonConfig.chargeStatus;
+  } else if (value == 5) {
+    return ButtonConfig.fieldGen;
+  } else if (value == 6) {
+    return ButtonConfig.toggleBle;
   } else {
     return ButtonConfig.disable;
   }

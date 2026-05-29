@@ -51,6 +51,10 @@ enum ChameleonCommand {
   setButtonPressConfig(1027),
   getLongButtonPressConfig(1028),
   setLongButtonPressConfig(1029),
+  getDoubleButtonPressConfig(1041),
+  setDoubleButtonPressConfig(1042),
+  getChordButtonPressConfig(1043),
+  setChordButtonPressConfig(1044),
 
   // BLE
   bleSetConnectKey(1030),
@@ -243,7 +247,9 @@ enum ButtonConfig {
   cycleForward(1),
   cycleBackward(2),
   cloneUID(3),
-  chargeStatus(4);
+  chargeStatus(4),
+  fieldGen(5),
+  toggleBle(6);
 
   const ButtonConfig(this.value);
   final int value;
@@ -446,21 +452,29 @@ class EmulatorSettings {
 }
 
 class DeviceSettings {
+  int settingsVersion;
   AnimationSetting animation;
   ButtonConfig aPress;
   ButtonConfig bPress;
   ButtonConfig aLongPress;
   ButtonConfig bLongPress;
+  ButtonConfig aDouble;
+  ButtonConfig bDouble;
+  ButtonConfig chord;
   bool pairingEnabled;
   String key;
   int? wakeTimeSeconds;
 
   DeviceSettings(
-      {this.animation = AnimationSetting.none,
+      {this.settingsVersion = 0,
+      this.animation = AnimationSetting.none,
       this.aPress = ButtonConfig.disable,
       this.bPress = ButtonConfig.disable,
       this.aLongPress = ButtonConfig.disable,
       this.bLongPress = ButtonConfig.disable,
+      this.aDouble = ButtonConfig.disable,
+      this.bDouble = ButtonConfig.disable,
+      this.chord = ButtonConfig.disable,
       this.pairingEnabled = false,
       this.key = "",
       this.wakeTimeSeconds});

@@ -982,6 +982,27 @@ class ChameleonCommunicator {
         data: Uint8List.fromList([type.value, mode.value]));
   }
 
+  Future<ButtonConfig> getDoubleButtonConfig(ButtonType type) async {
+    var resp = await sendCmd(ChameleonCommand.getDoubleButtonPressConfig,
+        data: Uint8List.fromList([type.value]));
+    return getButtonConfigType(resp!.data[0]);
+  }
+
+  Future<void> setDoubleButtonConfig(ButtonType type, ButtonConfig mode) async {
+    await sendCmd(ChameleonCommand.setDoubleButtonPressConfig,
+        data: Uint8List.fromList([type.value, mode.value]));
+  }
+
+  Future<ButtonConfig> getChordButtonConfig() async {
+    var resp = await sendCmd(ChameleonCommand.getChordButtonPressConfig);
+    return getButtonConfigType(resp!.data[0]);
+  }
+
+  Future<void> setChordButtonConfig(ButtonConfig mode) async {
+    await sendCmd(ChameleonCommand.setChordButtonPressConfig,
+        data: Uint8List.fromList([mode.value]));
+  }
+
   Future<int> getSleepTimeout() async {
     var resp = await sendCmd(ChameleonCommand.getSleepTimeout);
     return resp!.data[0];
@@ -1115,6 +1136,7 @@ class ChameleonCommunicator {
         bLongPress = getButtonConfigType(resp[5]);
 
     return DeviceSettings(
+        settingsVersion: resp[0],
         animation: animationMode,
         aPress: aPress,
         bPress: bPress,
