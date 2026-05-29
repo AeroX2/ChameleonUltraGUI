@@ -303,6 +303,35 @@ class _ConnectPageState extends State<ConnectPage> {
             onPressed: () async {
               Navigator.pop(dialogContext, localizations.flash);
               appState.changesMade();
+              try {
+                // Device is already in DFU; pick and flash a .zip directly.
+                await flashFirmwareZip(
+                  appState,
+                  scaffoldMessenger: scaffoldMessenger,
+                  enterDFU: false,
+                );
+              } catch (e) {
+                scaffoldMessenger.hideCurrentSnackBar();
+                scaffoldMessenger.showSnackBar(SnackBar(
+                  content:
+                      Text('${localizations.update_error}: ${e.toString()}'),
+                  action: SnackBarAction(
+                    label: localizations.close,
+                    onPressed: scaffoldMessenger.hideCurrentSnackBar,
+                  ),
+                ));
+              }
+              appState.changesMade();
+              if (mounted) {
+                _scanNow();
+              }
+            },
+            child: Text(localizations.flash_zip_dfu),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext, localizations.flash);
+              appState.changesMade();
 
               scaffoldMessenger.hideCurrentSnackBar();
               scaffoldMessenger.showSnackBar(
