@@ -360,10 +360,6 @@ ButtonConfig getButtonConfigType(int value) {
     return ButtonConfig.fieldGen;
   } else if (value == 6) {
     return ButtonConfig.toggleBle;
-  } else if (value == 7) {
-    return ButtonConfig.fullRead;
-  } else if (value == 8) {
-    return ButtonConfig.write;
   } else {
     return ButtonConfig.disable;
   }
