@@ -123,6 +123,7 @@
   "clone_uid": "Clone UID",
   "field": "Field",
   "toggle_ble": "Toggle BLE",
+  "full_read": "Full read",
   "double_press": "Double press",
   "chord_press": "A+B (chord)",
   "other": "Other",

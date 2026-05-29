@@ -81,6 +81,8 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
               localizations.charge,
               localizations.field,
               localizations.toggle_ble,
+              localizations.full_read,
+              localizations.write,
             ];
             TextEditingController bleKeyController =
                 TextEditingController(text: settings.key);
