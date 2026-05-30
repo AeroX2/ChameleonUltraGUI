@@ -360,6 +360,8 @@ ButtonConfig getButtonConfigType(int value) {
     return ButtonConfig.fieldGen;
   } else if (value == 6) {
     return ButtonConfig.toggleBle;
+  } else if (value == 7) {
+    return ButtonConfig.cloneLfUid;
   } else {
     return ButtonConfig.disable;
   }

@@ -249,7 +249,8 @@ enum ButtonConfig {
   cloneUID(3),
   chargeStatus(4),
   fieldGen(5),
-  toggleBle(6);
+  toggleBle(6),
+  cloneLfUid(7);
 
   const ButtonConfig(this.value);
   final int value;

@@ -121,6 +121,7 @@
   "forward": "Forward",
   "backward": "Backward",
   "clone_uid": "Clone UID",
+  "clone_lf": "Clone LF",
   "field": "Field",
   "toggle_ble": "Toggle BLE",
   "double_press": "Double press",
