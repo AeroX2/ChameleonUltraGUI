@@ -12,7 +12,6 @@ import 'package:chameleonultragui/helpers/open_collective.dart';
 import 'package:chameleonultragui/main.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:chameleonultragui/gui/component/qrcode_viewer.dart';
@@ -331,35 +330,18 @@ class SettingsMainPageState extends State<SettingsMainPage> {
                                     Navigator.pop(context);
                                   }
                                 },
-                                child: const Text("QR Code"),
+                                child: Text(localizations.qr_code),
                               ),
                               TextButton(
                                 onPressed: () async {
-                                  try {
-                                    await FileSaver.instance.saveAs(
-                                        name: 'ChameleonUltraGUISettings',
-                                        bytes: const Utf8Encoder().convert(
-                                            appState.sharedPreferencesProvider
-                                                .dumpSettingsToJson()),
-                                        ext: 'json',
-                                        mimeType: MimeType.other);
-                                  } on UnimplementedError catch (_) {
-                                    String? outputFile =
-                                        await FilePicker.platform.saveFile(
-                                      dialogTitle:
-                                          '${localizations.output_file}:',
-                                      fileName:
-                                          'ChameleonUltraGUISettings.json',
-                                    );
-
-                                    if (outputFile != null) {
-                                      var file = File(outputFile);
-                                      await file.writeAsBytes(
-                                          const Utf8Encoder().convert(appState
-                                              .sharedPreferencesProvider
-                                              .dumpSettingsToJson()));
-                                    }
-                                  }
+                                  await FilePicker.saveFile(
+                                    dialogTitle:
+                                        '${localizations.output_file}:',
+                                    fileName: 'ChameleonUltraGUISettings.json',
+                                    bytes: const Utf8Encoder().convert(appState
+                                        .sharedPreferencesProvider
+                                        .dumpSettingsToJson()),
+                                  );
                                 },
                                 child: Text(
                                     AppLocalizations.of(context)!.json_file),
@@ -429,14 +411,13 @@ class SettingsMainPageState extends State<SettingsMainPage> {
                               Navigator.pop(context);
                             }
                           },
-                          child: const Text("QR Code"),
+                          child: Text(localizations.qr_code),
                         ),
                         TextButton(
                           onPressed: () async {
-                            FilePickerResult? result =
-                                await FilePicker.platform.pickFiles();
+                            PlatformFile? result = await FilePicker.pickFile();
                             if (result != null) {
-                              File file = File(result.files.single.path!);
+                              File file = File(result.path!);
                               var contents = await file.readAsBytes();
                               var string =
                                   const Utf8Decoder().convert(contents);

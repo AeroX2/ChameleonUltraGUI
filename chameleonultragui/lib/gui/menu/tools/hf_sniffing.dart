@@ -11,7 +11,6 @@ import 'package:chameleonultragui/helpers/validators.dart';
 import 'package:chameleonultragui/main.dart';
 import 'package:chameleonultragui/recovery/recovery.dart' as recovery;
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -68,6 +67,9 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
 
   Future<void> _loadCapabilities() async {
     final appState = context.read<ChameleonGUIState>();
+    if (appState.communicator == null) {
+      return;
+    }
     try {
       final capabilities = await appState.communicator!.getDeviceCapabilities();
       if (!mounted) {
@@ -122,7 +124,7 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
         return;
       }
 
-      final capture = HfSniffCapture.fromRawBytes(rawBytes);
+      final capture = HfSniffCapture.fromChameleonBytes(rawBytes);
       setState(() {
         _capture = capture;
         _statusMessage = capture.frames.isEmpty
@@ -168,26 +170,71 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
     final filename =
         'hf-sniff-${DateTime.now().toIso8601String().replaceAll(':', '-')}';
 
-    try {
-      await FileSaver.instance.saveAs(
-          name: filename,
-          bytes: capture.rawBytes,
-          ext: 'bin',
-          mimeType: MimeType.other);
-      _showSnack(localizations.save_to_file);
-    } on UnimplementedError catch (_) {
-      final outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: '${localizations.output_file}:',
-        fileName: '$filename.bin',
-      );
+    final outputFile = await FilePicker.saveFile(
+      dialogTitle: '${localizations.output_file}:',
+      fileName: '$filename.trace',
+      bytes: capture.rawBytes,
+    );
 
-      if (outputFile != null) {
-        final file = File(outputFile);
-        await file.writeAsBytes(capture.rawBytes);
-        if (mounted) {
-          _showSnack(localizations.save_to_file);
+    if (outputFile != null && mounted) {
+      _showSnack(localizations.save_to_file);
+    }
+  }
+
+  Future<void> _loadCaptureFromFile() async {
+    final localizations = AppLocalizations.of(context)!;
+
+    final picked = await FilePicker.pickFile();
+    if (picked == null) {
+      return;
+    }
+
+    Uint8List? bytes;
+    if (picked.path != null) {
+      try {
+        bytes = await File(picked.path!).readAsBytes();
+      } catch (error) {
+        if (!mounted) {
+          return;
         }
+        setState(() {
+          _errorMessage = localizations.hf_sniff_load_failed(error.toString());
+        });
+        return;
       }
+    }
+
+    if (bytes == null || bytes.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage =
+            localizations.hf_sniff_load_failed(localizations.hf_sniff_no_frames);
+      });
+      return;
+    }
+
+    try {
+      final capture = HfSniffCapture.fromProxmarkTrace(bytes);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _capture = capture;
+        _recoveryStates.clear();
+        _errorMessage = null;
+        _statusMessage = capture.frames.isEmpty
+            ? localizations.hf_sniff_no_decoded_frames
+            : localizations.hf_sniff_loaded(capture.frames.length);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = localizations.hf_sniff_load_failed(error.toString());
+      });
     }
   }
 
@@ -437,7 +484,9 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
           runSpacing: 12,
           children: [
             FilledButton.icon(
-              onPressed: (_isCapturing || _capabilitySupported == false)
+              onPressed: (_isCapturing ||
+                      _capabilitySupported == false ||
+                      !_isDeviceConnected())
                   ? null
                   : _captureFrames,
               icon: _isCapturing
@@ -453,6 +502,11 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
               onPressed: _capture == null ? null : _exportCapture,
               icon: const Icon(Icons.download),
               label: Text(localizations.save_to_file),
+            ),
+            OutlinedButton.icon(
+              onPressed: _isCapturing ? null : _loadCaptureFromFile,
+              icon: const Icon(Icons.upload_file),
+              label: Text(localizations.hf_sniff_load_file),
             ),
             OutlinedButton.icon(
               onPressed: _capture == null
@@ -493,6 +547,31 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
   }
 
   Widget _buildCapabilityBanner(AppLocalizations localizations) {
+    if (!_isDeviceConnected()) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Card(
+          color: Colors.orange.withValues(alpha: 0.1),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(Icons.info_outline, color: Colors.orange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    localizations.sniff_device_required_hint,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_capabilitySupported != false) {
       return const SizedBox.shrink();
     }
@@ -519,6 +598,10 @@ class _HfSniffingMenuState extends State<HfSniffingMenu> {
         ),
       ),
     );
+  }
+
+  bool _isDeviceConnected() {
+    return context.read<ChameleonGUIState>().communicator != null;
   }
 
   Widget _buildStatusBlock() {

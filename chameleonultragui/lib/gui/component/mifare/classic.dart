@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:chameleonultragui/gui/component/card_button.dart';
@@ -13,7 +12,6 @@ import 'package:chameleonultragui/helpers/mifare_classic/recovery.dart';
 import 'package:chameleonultragui/main.dart';
 import 'package:chameleonultragui/sharedprefsprovider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 
 // Localizations
@@ -52,39 +50,20 @@ class CardReaderState extends State<MifareClassicHelper> {
   Future<void> saveCard({bool bin = false, bool skipDump = false}) async {
     var appState = Provider.of<ChameleonGUIState>(context, listen: false);
 
-    List<int> cardDump = [];
     var localizations = AppLocalizations.of(context)!;
+    Uint8List cardDump = Uint8List(0);
     if (!skipDump) {
-      for (var sector = 0;
-          sector < mfClassicGetSectorCount(widget.mfcInfo.type);
-          sector++) {
-        for (var block = 0;
-            block < mfClassicGetBlockCountBySector(sector);
-            block++) {
-          cardDump.addAll(widget.mfcInfo.recovery!
-              .cardData[block + mfClassicGetFirstBlockCountBySector(sector)]);
-        }
-      }
+      cardDump = mfClassicGetExportBytes(
+          widget.mfcInfo.type, widget.mfcInfo.recovery!.cardData,
+          isEV1: widget.mfcInfo.isEV1);
     }
 
     if (bin) {
-      try {
-        await FileSaver.instance.saveAs(
-            name: widget.hfInfo.uid.replaceAll(" ", ""),
-            bytes: Uint8List.fromList(cardDump),
-            ext: 'bin',
-            mimeType: MimeType.other);
-      } on UnimplementedError catch (_) {
-        String? outputFile = await FilePicker.platform.saveFile(
-          dialogTitle: '${localizations.output_file}:',
-          fileName: '${widget.hfInfo.uid.replaceAll(" ", "")}.bin',
-        );
-
-        if (outputFile != null) {
-          var file = File(outputFile);
-          await file.writeAsBytes(Uint8List.fromList(cardDump));
-        }
-      }
+      await FilePicker.saveFile(
+        dialogTitle: '${localizations.output_file}:',
+        fileName: '${widget.hfInfo.uid.replaceAll(" ", "")}.bin',
+        bytes: cardDump,
+      );
     } else {
       var tags = appState.sharedPreferencesProvider.getCards();
       tags.add(CardSave(
@@ -183,13 +162,7 @@ class CardReaderState extends State<MifareClassicHelper> {
         ],
         if (widget.mfcInfo.state == MifareClassicState.recovery ||
             widget.mfcInfo.state == MifareClassicState.recoveryOngoing)
-          FittedBox(
-              alignment: Alignment.topCenter,
-              fit: BoxFit.scaleDown,
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
+          _ResponsiveButtonGroup(children: [
                     const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: (widget.mfcInfo.state ==
@@ -259,7 +232,7 @@ class CardReaderState extends State<MifareClassicHelper> {
                       style: customCardButtonStyle(appState),
                       child: Text(localizations.export_to_dictionary),
                     ),
-                  ])),
+          ]),
         if (widget.mfcInfo.state == MifareClassicState.checkKeys ||
             widget.mfcInfo.state == MifareClassicState.checkKeysOngoing)
           Column(children: [
@@ -357,10 +330,7 @@ class CardReaderState extends State<MifareClassicHelper> {
         if ((widget.mfcInfo.state == MifareClassicState.dump ||
                 widget.mfcInfo.state == MifareClassicState.dumpOngoing) &&
             widget.allowSave)
-          FittedBox(
-              alignment: Alignment.topCenter,
-              fit: BoxFit.scaleDown,
-              child: Row(children: [
+          _ResponsiveButtonGroup(children: [
                 ElevatedButton(
                   onPressed: (widget.mfcInfo.state == MifareClassicState.dump)
                       ? () async {
@@ -396,14 +366,12 @@ class CardReaderState extends State<MifareClassicHelper> {
                   style: customCardButtonStyle(appState),
                   child: Text(localizations.export_to_dictionary),
                 ),
-              ])),
+          ]),
       ],
       if (widget.mfcInfo.state == MifareClassicState.save && widget.allowSave)
-        Center(
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+        _ResponsiveButtonGroup(
+            centerOnly: true,
+            children: [
               ElevatedButton(
                 onPressed: () async {
                   await showDialog(
@@ -451,7 +419,49 @@ class CardReaderState extends State<MifareClassicHelper> {
                 style: customCardButtonStyle(appState),
                 child: Text(localizations.save_as(".bin")),
               ),
-            ])),
+            ]),
     ]);
+  }
+}
+
+class _ResponsiveButtonGroup extends StatelessWidget {
+  final List<Widget> children;
+  final bool centerOnly;
+
+  const _ResponsiveButtonGroup({
+    required this.children,
+    this.centerOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).size.width < 800) {
+      final buttons = children.where((child) => child is! SizedBox).toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var index = 0; index < buttons.length; index++) ...[
+            if (index > 0) const SizedBox(height: 8),
+            buttons[index],
+          ],
+        ],
+      );
+    }
+
+    final row = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: children,
+    );
+
+    if (centerOnly) {
+      return Center(child: row);
+    }
+
+    return FittedBox(
+      alignment: Alignment.topCenter,
+      fit: BoxFit.scaleDown,
+      child: row,
+    );
   }
 }
