@@ -124,14 +124,17 @@ class BLESerial extends AbstractSerial {
 
   @override
   Future<bool> connectSpecificDevice(dynamic devicePort) async {
-    // As BLE is unstable, we try to connect 5 times
-    // And fail only then
+    // BLE can fail transiently, so retry with a short backoff. Kept low
+    // deliberately: each attempt now has its own timeout, and too many rapid
+    // attempts trip Android's ~5-scans-per-30s throttle (which then makes
+    // every subsequent scan/connect silently fail).
     bool ret = false;
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < 2; i++) {
       ret = await connectSpecificInternal(devicePort);
       if (ret) {
         break;
       }
+      await Future.delayed(const Duration(milliseconds: 500));
     }
 
     return ret;
@@ -139,18 +142,19 @@ class BLESerial extends AbstractSerial {
 
   Future<bool> connectSpecificInternal(dynamic devicePort) async {
     Completer<bool> completer = Completer<bool>();
-    List<Uuid> services = [nrfUUID, uartRX, uartTX];
-    if (chameleonMap[devicePort]!.dfu) {
-      services = [dfuUUID, dfuControl, dfuFirmware];
-    }
 
     await performDisconnect();
     pendingConnection = true;
+    // Connect directly by id instead of connectToAdvertisingDevice. The latter
+    // pre-scans for a live advertisement, which (a) adds another BLE scan that
+    // trips Android's scan throttle, and (b) never resolves when the device is
+    // not currently advertising - e.g. right after an unclean disconnect, while
+    // it still holds the stale link. connectToDevice connects by id, honours a
+    // real connectionTimeout, and does not require catching an advertisement.
     connection = flutterReactiveBle
-        .connectToAdvertisingDevice(
+        .connectToDevice(
       id: devicePort,
-      withServices: services,
-      prescanDuration: const Duration(seconds: 5),
+      connectionTimeout: const Duration(seconds: 10),
     )
         .listen((connectionState) async {
       log.w(connectionState);
@@ -263,7 +267,18 @@ class BLESerial extends AbstractSerial {
       completer.complete(false);
     });
 
-    return completer.future;
+    // Backstop timeout: even connectToDevice's connectionTimeout can, in rare
+    // cases, fail to surface a state on Android. Guarantee the attempt always
+    // resolves so pendingConnection is cleared and the UI never wedges on the
+    // "connecting" spinner.
+    return completer.future.timeout(
+      const Duration(seconds: 15),
+      onTimeout: () async {
+        log.w("BLE connection attempt timed out");
+        await performDisconnect();
+        return false;
+      },
+    );
   }
 
   @override

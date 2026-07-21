@@ -17,7 +17,7 @@ import 'package:chameleonultragui/generated/i18n/app_localizations.dart';
 class ConnectPage extends StatefulWidget {
   const ConnectPage({
     super.key,
-    this.autoScanInterval = const Duration(seconds: 3),
+    this.autoScanInterval = const Duration(seconds: 6),
   });
 
   final Duration autoScanInterval;
@@ -245,6 +245,9 @@ class _ConnectPageState extends State<ConnectPage> {
       });
     }
 
+    final messenger = ScaffoldMessenger.of(context);
+    final localizations = AppLocalizations.of(context)!;
+
     try {
       if (chameleonDevice.type == ConnectionType.ble) {
         appState.connector!.pendingConnection = true;
@@ -260,6 +263,11 @@ class _ConnectPageState extends State<ConnectPage> {
             ChameleonCommunicator(appState.log!, port: appState.connector);
       } else {
         appState.connector!.pendingConnection = false;
+        if (!fromAutoConnect && mounted) {
+          messenger.showSnackBar(
+            SnackBar(content: Text(localizations.connection_failed)),
+          );
+        }
       }
 
       appState.changesMade();

@@ -42,6 +42,14 @@ class PendingConnectionPage extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.bold),
             )
           ],
+          const SizedBox(height: 25),
+          OutlinedButton(
+            onPressed: () async {
+              await appState.connector!.performDisconnect();
+              appState.changesMade();
+            },
+            child: Text(localizations.cancel),
+          ),
         ])));
   }
 }
