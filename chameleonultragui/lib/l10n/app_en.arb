@@ -114,6 +114,7 @@
   "flash_via_dfu": "Flash latest FW via DFU",
   "flash_zip_dfu": "Flash .zip FW via DFU",
   "animations": "Animations",
+  "hf_reader_gain": "HF reader gain",
   "button_config": "Button config",
   "button_x": "{x} button",
   "long_press": "Long press",

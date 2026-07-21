@@ -81,6 +81,8 @@ enum ChameleonCommand {
   mf1CheckKeysOnBlock(2015),
   hf14ARawCommand(2010),
   hf14aSniff(2020),
+  hf14aSetRxGain(2018),
+  hf14aGetRxGain(2019),
 
   // lf commands
   scanEM410Xtag(3000),
@@ -465,6 +467,7 @@ class DeviceSettings {
   bool pairingEnabled;
   String key;
   int? wakeTimeSeconds;
+  int rxGain; // RC522 RxGain register byte (0x40/0x50/0x60/0x70); Ultra only
 
   DeviceSettings(
       {this.settingsVersion = 0,
@@ -478,7 +481,8 @@ class DeviceSettings {
       this.chord = ButtonConfig.disable,
       this.pairingEnabled = false,
       this.key = "",
-      this.wakeTimeSeconds});
+      this.wakeTimeSeconds,
+      this.rxGain = 0x60});
 }
 
 enum MifareClassicValueBlockOperator {
