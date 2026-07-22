@@ -43,6 +43,11 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
       if (settings.settingsVersion >= 8) {
         settings.chord = await communicator.getChordButtonConfig();
       }
+      // HF reader gain (settings version 12+) is Ultra-only reader hardware.
+      if (settings.settingsVersion >= 12 &&
+          appState.connector!.device == ChameleonDevice.ultra) {
+        settings.rxGain = await communicator.getHf14aRxGain();
+      }
       return settings;
     } catch (_) {
       return DeviceSettings();
@@ -203,6 +208,33 @@ class ChameleonSettingsState extends State<ChameleonSettings> {
                           setState(() {});
                           appState.changesMade();
                         }),
+                    ...(settings.settingsVersion >= 12 &&
+                            appState.connector!.device ==
+                                ChameleonDevice.ultra)
+                        ? [
+                            const SizedBox(height: 10),
+                            Text("${localizations.hf_reader_gain}:"),
+                            const SizedBox(height: 10),
+                            ToggleButtonsWrapper(
+                                items: const [
+                                  "33 dB",
+                                  "38 dB",
+                                  "43 dB",
+                                  "48 dB"
+                                ],
+                                selectedValue:
+                                    ((settings.rxGain - 0x40) >> 4).clamp(0, 3),
+                                onChange: (int index) async {
+                                  int reg = 0x40 + (index << 4);
+                                  await appState.communicator!
+                                      .setHf14aRxGain(reg);
+                                  await appState.communicator!.saveSettings();
+                                  settings.rxGain = reg;
+                                  setState(() {});
+                                  appState.changesMade();
+                                }),
+                          ]
+                        : [],
                     ...(settings.wakeTimeSeconds != null)
                         ? [
                             const SizedBox(height: 10),

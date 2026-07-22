@@ -9,7 +9,6 @@ import 'package:chameleonultragui/helpers/mifare_ultralight/general.dart';
 import 'package:chameleonultragui/main.dart';
 import 'package:chameleonultragui/sharedprefsprovider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
@@ -384,45 +383,46 @@ AnimationSetting getAnimationModeType(int value) {
 Future<void> saveTag(CardSave tag, BuildContext context, bool bin) async {
   var localizations = AppLocalizations.of(context)!;
   if (bin) {
-    List<int> tagDump = [];
-    for (var block in tag.data) {
-      tagDump.addAll(block);
-    }
-    try {
-      await FileSaver.instance.saveAs(
-          name: tag.name,
-          bytes: Uint8List.fromList(tagDump),
-          ext: 'bin',
-          mimeType: MimeType.other);
-    } on UnimplementedError catch (_) {
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: '${localizations.output_file}:',
-        fileName: '${tag.name}.bin',
-      );
-
-      if (outputFile != null) {
-        var file = File(outputFile);
-        await file.writeAsBytes(Uint8List.fromList(tagDump));
+    Uint8List tagDump;
+    if (isMifareClassic(tag.tag)) {
+      tagDump = mfClassicGetExportBytes(
+          chameleonTagTypeGetMfClassicType(tag.tag), tag.data,
+          isEV1: chameleonTagSaveCheckForMifareClassicEV1(tag));
+    } else {
+      List<int> dump = [];
+      for (var block in tag.data) {
+        dump.addAll(block);
       }
+      tagDump = Uint8List.fromList(dump);
     }
+    await FilePicker.saveFile(
+      dialogTitle: '${localizations.output_file}:',
+      fileName: '${tag.name}.bin',
+      bytes: tagDump,
+    );
   } else {
-    try {
-      await FileSaver.instance.saveAs(
+    var exportTag = tag;
+    if (isMifareClassic(tag.tag)) {
+      exportTag = CardSave(
+          id: tag.id,
+          uid: tag.uid,
+          sak: tag.sak,
+          atqa: tag.atqa,
+          ats: tag.ats,
           name: tag.name,
-          bytes: const Utf8Encoder().convert(tag.toJson()),
-          ext: 'json',
-          mimeType: MimeType.other);
-    } on UnimplementedError catch (_) {
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: '${localizations.output_file}:',
-        fileName: '${tag.name}.json',
-      );
-
-      if (outputFile != null) {
-        var file = File(outputFile);
-        await file.writeAsBytes(const Utf8Encoder().convert(tag.toJson()));
-      }
+          tag: tag.tag,
+          data: mfClassicGetExportBlocks(
+              chameleonTagTypeGetMfClassicType(tag.tag), tag.data,
+              isEV1: chameleonTagSaveCheckForMifareClassicEV1(tag)),
+          extraData: tag.extraData,
+          folderId: tag.folderId,
+          color: tag.color);
     }
+    await FilePicker.saveFile(
+      dialogTitle: '${localizations.output_file}:',
+      fileName: '${tag.name}.json',
+      bytes: const Utf8Encoder().convert(exportTag.toJson()),
+    );
   }
 }
 
@@ -489,6 +489,8 @@ TagType getTagTypeByDumpSize(int size) {
     case 1024:
       return TagType.mifare1K;
     case 1088: // EV1
+    case 1152: // EV1
+      return TagType.mifare1K;
     case 2048:
       return TagType.mifare2K;
     case 4096:

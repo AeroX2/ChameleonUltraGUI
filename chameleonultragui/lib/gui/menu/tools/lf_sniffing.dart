@@ -8,7 +8,6 @@ import 'package:chameleonultragui/helpers/lf_sniff.dart';
 import 'package:chameleonultragui/helpers/validators.dart';
 import 'package:chameleonultragui/main.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -55,6 +54,9 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
 
   Future<void> _loadCapabilities() async {
     final appState = context.read<ChameleonGUIState>();
+    if (appState.communicator == null) {
+      return;
+    }
     try {
       final capabilities = await appState.communicator!.getDeviceCapabilities();
       if (!mounted) {
@@ -72,6 +74,10 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
         _capabilitySupported = null;
       });
     }
+  }
+
+  bool _isDeviceConnected() {
+    return context.read<ChameleonGUIState>().communicator != null;
   }
 
   Future<void> _captureLfSamples() async {
@@ -191,27 +197,75 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
     final filename =
         'lf-sniff-${DateTime.now().toIso8601String().replaceAll(':', '-')}';
 
-    try {
-      await FileSaver.instance.saveAs(
-          name: filename,
-          bytes: capture.samples,
-          ext: 'bin',
-          mimeType: MimeType.other);
-      _showSnack(localizations.save_to_file);
-    } on UnimplementedError catch (_) {
-      final outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: '${localizations.output_file}:',
-        fileName: '$filename.bin',
-      );
+    final outputFile = await FilePicker.saveFile(
+      dialogTitle: '${localizations.output_file}:',
+      fileName: '$filename.bin',
+      bytes: capture.samples,
+    );
 
-      if (outputFile != null) {
-        final file = File(outputFile);
-        await file.writeAsBytes(capture.samples);
-        if (mounted) {
-          _showSnack(localizations.save_to_file);
-        }
-      }
+    if (outputFile != null && mounted) {
+      _showSnack(localizations.save_to_file);
     }
+  }
+
+  Future<void> _loadCaptureFromFile() async {
+    final localizations = AppLocalizations.of(context)!;
+
+    final picked = await FilePicker.pickFile();
+    if (picked == null) {
+      return;
+    }
+
+    if (picked.path == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage =
+            localizations.lf_sniff_load_failed(localizations.lf_sniff_no_samples);
+      });
+      return;
+    }
+
+    Uint8List bytes;
+    try {
+      bytes = await File(picked.path!).readAsBytes();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = localizations.lf_sniff_load_failed(error.toString());
+      });
+      return;
+    }
+
+    if (bytes.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage =
+            localizations.lf_sniff_load_failed(localizations.lf_sniff_no_samples);
+      });
+      return;
+    }
+
+    final capture = LfSniffCapture.fromSamples(bytes);
+    final decodeOutcome = _buildDecodeResult(capture.samples);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _capture = capture;
+      _decodeResult = decodeOutcome.result;
+      _decodeError = decodeOutcome.error;
+      _errorMessage = null;
+      _statusMessage =
+          localizations.lf_sniff_loaded(capture.summary.sampleCount);
+    });
   }
 
   Future<void> _copyText(String text, String successMessage) async {
@@ -407,8 +461,9 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
   Future<void> _openWaveformViewer(LfSniffCapture capture) async {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 700;
+    final navigator = Navigator.of(context);
     final zoom = isCompact
-        ? await Navigator.of(context).push<double>(
+        ? await navigator.push<double>(
             MaterialPageRoute(
               fullscreenDialog: true,
               builder: (context) => _LfWaveformFullscreenPage(
@@ -571,7 +626,9 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
             : WrapCrossAlignment.start,
         children: [
           FilledButton.icon(
-            onPressed: (_isCapturing || _capabilitySupported == false)
+            onPressed: (_isCapturing ||
+                    _capabilitySupported == false ||
+                    !_isDeviceConnected())
                 ? null
                 : _captureLfSamples,
             icon: _isCapturing
@@ -587,6 +644,11 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
             onPressed: _capture == null ? null : _exportCapture,
             icon: const Icon(Icons.download),
             label: Text(localizations.save_to_file),
+          ),
+          OutlinedButton.icon(
+            onPressed: _isCapturing ? null : _loadCaptureFromFile,
+            icon: const Icon(Icons.upload_file),
+            label: Text(localizations.lf_sniff_load_file),
           ),
           OutlinedButton.icon(
             onPressed: _capture == null
@@ -629,6 +691,31 @@ class _LfSniffingMenuState extends State<LfSniffingMenu> {
   }
 
   Widget _buildCapabilityBanner(AppLocalizations localizations) {
+    if (!_isDeviceConnected()) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Card(
+          color: Colors.orange.withValues(alpha: 0.1),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(Icons.info_outline, color: Colors.orange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    localizations.sniff_device_required_hint,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_capabilitySupported != false) {
       return const SizedBox.shrink();
     }

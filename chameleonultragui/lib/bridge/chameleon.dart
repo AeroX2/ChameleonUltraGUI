@@ -218,6 +218,18 @@ class ChameleonCommunicator {
         data: Uint8List.fromList([readerMode ? 1 : 0]));
   }
 
+  // RC522 HF reader receiver gain (RFCfgReg byte 0x40/0x50/0x60/0x70). Ultra
+  // only. setHf14aRxGain stages the value; call saveSettings to persist it.
+  Future<int> getHf14aRxGain() async {
+    var resp = await sendCmd(ChameleonCommand.hf14aGetRxGain);
+    return resp!.data[0];
+  }
+
+  Future<void> setHf14aRxGain(int gain) async {
+    await sendCmd(ChameleonCommand.hf14aSetRxGain,
+        data: Uint8List.fromList([gain]));
+  }
+
   Future<CardData?> scan14443aTag() async {
     var resp = await sendCmd(ChameleonCommand.scan14ATag);
 
