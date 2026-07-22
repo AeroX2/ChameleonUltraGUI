@@ -96,6 +96,7 @@ enum ChameleonCommand {
   writePacToT5577(3015),
   writeIdteckToT5577(3018),
   lfSniff(3031),
+  lfTune(3033),
 
   mf1LoadBlockData(4000),
   mf1SetAntiCollision(4001),

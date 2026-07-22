@@ -5,6 +5,7 @@ import 'package:chameleonultragui/helpers/definitions.dart';
 import 'package:chameleonultragui/helpers/general.dart';
 import 'package:chameleonultragui/connector/serial_abstract.dart';
 import 'package:chameleonultragui/helpers/mifare_classic/general.dart';
+import 'package:chameleonultragui/helpers/lf_tuning.dart';
 import 'package:logger/logger.dart';
 
 // Some ChatGPT magic
@@ -710,6 +711,31 @@ class ChameleonCommunicator {
     }
 
     throw ('LF sniff failed with status 0x${resp.status.toRadixString(16)}');
+  }
+
+  Future<LfTuneStatus> getLfTune() async {
+    final resp = await sendCmd(ChameleonCommand.lfTune,
+        data: Uint8List.fromList([0]));
+    if (resp == null || resp.status != 0x68) throw ('LF tune get failed');
+    return LfTuneStatus.fromBytes(resp.data);
+  }
+
+  Future<LfTuneStatus> setLfTune(int frequencyKHz,
+      {bool persist = false}) async {
+    if (frequencyKHz < 115 || frequencyKHz > 135) {
+      throw RangeError.range(frequencyKHz, 115, 135, 'frequencyKHz');
+    }
+    final resp = await sendCmd(ChameleonCommand.lfTune,
+        data: Uint8List.fromList([1, frequencyKHz, persist ? 1 : 0]));
+    if (resp == null || resp.status != 0x68) throw ('LF tune set failed');
+    return LfTuneStatus.fromBytes(resp.data);
+  }
+
+  Future<LfTuneSweep> sweepLfTune() async {
+    final resp = await sendCmd(ChameleonCommand.lfTune,
+        data: Uint8List.fromList([2]), timeout: const Duration(seconds: 5));
+    if (resp == null || resp.status != 0x68) throw ('LF tune sweep failed');
+    return LfTuneSweep.fromBytes(resp.data);
   }
 
   Future<Uint8List> hf14aSniff({int timeoutMs = 5000}) async {
