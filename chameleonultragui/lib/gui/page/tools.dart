@@ -2,6 +2,7 @@ import 'package:chameleonultragui/generated/i18n/app_localizations.dart';
 import 'package:chameleonultragui/gui/menu/tools/dictionary_download.dart';
 import 'package:chameleonultragui/gui/menu/tools/hf_sniffing.dart';
 import 'package:chameleonultragui/gui/menu/tools/lf_sniffing.dart';
+import 'package:chameleonultragui/gui/menu/tools/lf_tuning.dart';
 import 'package:chameleonultragui/gui/menu/tools/t55xx_password_cleaner.dart';
 import 'package:chameleonultragui/main.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +52,12 @@ class ToolsPageState extends State<ToolsPage> {
           description: localizations.t55xx_password_cleaner_description,
           icon: Icons.password,
           onPressed: const T55XXPasswordCleanerMenu(),
+          isDeviceRequired: true),
+      ToolItem(
+          name: 'LF antenna tuning',
+          description: 'Sweep the LF carrier and save a reliable reading frequency',
+          icon: Icons.multiline_chart,
+          onPressed: const LfTuningMenu(),
           isDeviceRequired: true),
       ToolItem(
           name: localizations.lf_sniffing,
